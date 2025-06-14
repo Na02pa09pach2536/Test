@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ฟอร์มหนังสือราชการ</title>
+  <style>
+    body { font-family: sans-serif; margin: 20px; }
+    label { display: block; margin-top: 10px; }
+    input, select, textarea { width: 100%; padding: 8px; margin-top: 5px; }
+    button { padding: 10px 20px; margin-top: 20px; }
+    .status { margin-top: 15px; color: green; }
+    @media (max-width: 600px) {
+      input, select, textarea { font-size: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <h2>ฟอร์มหนังสือเกษียน/คำสั่ง/แจ้งเวียน</h2>
+  <form id="bookForm">
+    <label>เลขที่หนังสือ<input type="text" name="bookNumber" required></label>
+    <label>ลงวันที่<input type="date" name="bookDate" required></label>
+    <label>เรื่อง<input type="text" name="subject" required></label>
+
+    <label>มอบหมาย 1
+      <select name="assignee1">
+        <option>-- ผู้ที่ได้รับมอบหมาย --</option>
+        <option>กฤติยา</option><option>ภัควรินทร์</option><option>ธิติมา</option><option>ฐิตาภัสร์</option>
+        <option>รุ่งลักษณ์</option><option>ณปภัช</option><option>ทรงกรด</option><option>นภัสวรรณ</option>
+        <option>สุภาพร</option><option>อลิษา</option><option>เจ้าหน้าที่ทุกคน</option><option>พัสดุ</option>
+        <option>การเงิน</option><option>หัวหน้าฝ่ายบริหาร</option>
+      </select>
+    </label>
+    <label>มอบหมาย 2<select name="assignee2"></select></label>
+    <label>มอบหมาย 3<select name="assignee3"></select></label>
+    <label>มอบหมาย 4<select name="assignee4"></select></label>
+    <label>มอบหมาย 5<select name="assignee5"></select></label>
+
+    <label>หมายเหตุ<textarea name="note"></textarea></label>
+
+    <div id="fileInputs">
+      <label>อัปโหลดเอกสาร 1<input type="file" name="file1"></label>
+      <label>อัปโหลดเอกสาร 2<input type="file" name="file2"></label>
+      <label>อัปโหลดเอกสาร 3<input type="file" name="file3"></label>
+      <label>อัปโหลดเอกสาร 4<input type="file" name="file4"></label>
+      <label>อัปโหลดเอกสาร 5<input type="file" name="file5"></label>
+    </div>
+
+    <button type="submit">บันทึกข้อมูล</button>
+    <div class="status" id="status"></div>
+  </form>
+
+  <script>
+    const scriptURL = 'https://script.google.com/macros/s/1CIa0bUeDPh3W6UqFjrwoXRm5TCtU-4rMV6dOHS8dzdw6KfCzTo9PIUMp/exec';
+
+    const form = document.getElementById('bookForm');
+    const status = document.getElementById('status');
+
+    const convertToBase64 = file => new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = error => reject(error);
+    });
+
+    const populateDropdowns = () => {
+      const options = document.querySelector('select[name="assignee1"]').innerHTML;
+      for (let i = 2; i <= 5; i++) {
+        document.querySelector(`select[name="assignee${i}"]`).innerHTML = options;
+      }
+    };
+
+    populateDropdowns();
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      status.textContent = 'กำลังบันทึกข้อมูล...';
+
+      const formData = new FormData(form);
+      const bookNumber = formData.get('bookNumber');
+      const subject = formData.get('subject');
+      const bookDate = new Date(formData.get('bookDate'));
+      const buddhistDate = `${bookDate.getDate().toString().padStart(2, '0')}/${(bookDate.getMonth()+1).toString().padStart(2, '0')}/${bookDate.getFullYear()+543}`;
+
+      const data = {
+        bookNumber,
+        bookDate: buddhistDate,
+        subject,
+        note: formData.get('note') || '',
+        assignees: [1,2,3,4,5].map(i => formData.get(`assignee${i}`)).filter(Boolean),
+        files: []
+      };
+
+      for (let i = 1; i <= 5; i++) {
+        const file = formData.get(`file${i}`);
+        if (file && file.name) {
+          const base64 = await convertToBase64(file);
+          const mime = base64.match(/^data:(.*);base64,/)[1];
+          const base64Content = base64.split(',')[1];
+          data.files.push({
+            name: `${bookNumber}_${subject}_${i}${file.name.substring(file.name.lastIndexOf('.'))}`,
+            mime,
+            content: base64Content
+          });
+        }
+      }
+
+      const params = new URLSearchParams();
+      params.set('data', JSON.stringify(data));
+
+      fetch(scriptURL, {
+        method: 'POST',
+        body: params
+      })
+      .then(res => res.text())
+      .then(msg => {
+        status.textContent = '✅ บันทึกสำเร็จ';
+        form.reset();
+      })
+      .catch(err => {
+        status.textContent = '❌ เกิดข้อผิดพลาดในการบันทึก';
+      });
+    });
+  </script>
+</body>
+</html>
+add form
